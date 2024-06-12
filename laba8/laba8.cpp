@@ -11,58 +11,122 @@ struct Treenode {
 	unsigned short minDepth = 0;
 };
 
+template <typename T>
+struct Node {
+	T info;
+	Node* next = nullptr;
+	Node* prev = nullptr;
+};
+
+template <typename T>
+struct List {
+	int counting = 0;
+	int position = 0;
+	Node<T>* now = nullptr;
+	Node<T>* first = nullptr;
+	Node<T>* last = nullptr;
+
+	void toIndex(int index) {
+		if (abs(index - position) > (counting - 1 - index)) {
+			now = last;
+			position = counting - 1;
+		}
+		if (abs(index - position) > index) {
+			now = first;
+			position = 0;
+		}
+		if (index > position) { for (int i = 0; i < index - position; i++) { now = now->next; } }
+		else { for (int i = 0; i < position - index; i++) { now = now->prev; } }
+		position = index;
+	}
+
+	void add(T info) {
+		Node<T>* node = new Node<T>();
+		node->info = info;
+		if (counting == 0) {
+			first = node;
+			last = node;
+			now = node;
+		}
+		else {
+			node->prev = last;
+			last->next = node;
+			last = node;
+		}
+		counting++;
+	}
+
+	void insert(int index, T info) {
+		if (index < 0 || index > counting) { throw 0; }
+		if (index == counting) {
+			add(info);
+			return;
+		}
+		toIndex(index);
+		Node<T>* node = new Node<T>();
+		node->info = info;
+		node->prev = now->prev;
+		now->prev = node;
+		node->next = now;
+		if (node->prev != nullptr) { node->prev->next = node; }
+		else { first = node; }
+		counting++;
+		position++;
+	}
+
+	void removeAt(int index) {
+		if (index < 0 || index >= counting) { throw 0; }
+		toIndex(index);
+		Node<T>* del = now;
+		if (last == first) {
+			clear();
+			return;
+		}
+		if (del == last) {
+			last = last->prev;
+			last->next = nullptr;
+			now = last;
+			position--;
+		}
+		else if (del == first) {
+			first = first->next;
+			first->prev = nullptr;
+			now = first;
+		}
+		else {
+			now = now->next;
+			del->next->prev = del->prev;
+			del->prev->next = del->next;
+		}
+		delete del;
+		counting--;
+	}
+
+	T elementAt(int index) {
+		if (index < 0 || index >= counting) { throw 0; }
+		toIndex(index);
+		return now->info;
+	}
+
+	int count() { return counting; }
+
+	void clear() {
+		int kol = counting;
+		for (int i = 0; i < kol; i++) {
+			Node<T>* del = first;
+			first = first->next;
+			delete del;
+		}
+		last = nullptr;
+		now = nullptr;
+		position = 0;
+		counting = 0;
+	}
+};
+
 //структура дерева
 struct Tree {
 
-	//структура очереди
-	struct Queue {
-		// узел односвязного списка
-		struct Node {
-			Treenode* data = nullptr;
-			Node* next = nullptr;
-		};
-
-		int cnt = 0;
-		Node* first = nullptr;
-		Node* last = nullptr;
-
-		//функция добавления элемента в очередь
-		void queue(Treenode* Treenode) {
-			Node* newNode = new Node();
-			newNode->data = Treenode;
-			newNode->next = nullptr;
-			if (first == nullptr) {
-				first = newNode;
-				last = newNode;
-			}
-			else {
-				last->next = newNode;
-				last = newNode;
-			}
-			cnt++;
-		}
-
-		//функция извлечения элемента из очереди 
-		int unqueue() {
-			if (first == nullptr) {
-				return 0;
-			}
-			int data = first->data->key;
-			Node* temp = first;
-			first = first->next;
-			if (first == nullptr) {
-				last = nullptr;
-			}
-			delete temp;
-			cnt--;
-			return data;
-		}
-
-		//функция подсчета количества значений в очереди
-		int count() {
-			return cnt;
-		}
-	};
 
 	Treenode* root = nullptr;
 	int cnt = 0;
@@ -178,34 +242,34 @@ struct Tree {
 	}
 
 	//обход дерева по уровням
-	void traverse(int* array, int& index, Order order, Treenode* temp) {
-		if (temp == nullptr) {
-			return;
-		}
-		Queue* queue = new Queue;
-		queue->queue(temp);
+	int* ToLevels(Order order) {
+		int index = 0;
+		int* arr = new int[cnt];
+		List<Treenode*> list;
+		list.add(root);
 		while (index != cnt) {
-			for (int i = queue->count(); i > 0; i--) {
-				if (order == LevelsUpLeft || order == LevelsDownRight) {
-					if (queue->first->data->left != nullptr) {
-						queue->queue(queue->first->data->left);
+			for (int i = list.count(); i > 0; i--) {
+				if (order == LevelsUpLeft || order == LevelsDownRight)
+					if (list.elementAt(0)->left != nullptr) {
+						list.add(list.elementAt(0)->left);
 					}
-				}
-				if (queue->first->data->right != nullptr) {
-					queue->queue(queue->first->data->right);
+				if (list.elementAt(0)->right != nullptr) {
+					list.add(list.elementAt(0)->right);
 				}
 				if (order == LevelsUpRight || order == LevelsDownLeft) {
-					if (queue->first->data->left != nullptr) {
-						queue->queue(queue->first->data->left);
+					if (list.elementAt(0)->left != nullptr) {
+						list.add(list.elementAt(0)->left);
 					}
 				}
-				array[index] = queue->unqueue();
+				arr[index] = list.elementAt(0)->key;
+				list.removeAt(0);
 				index++;
 			}
 		}
 		if (order == LevelsDownLeft || order == LevelsDownRight) {
-			reverse(array, array + cnt);
+			reverse(arr, arr + cnt);
 		}
+		return arr;
 	}
 
 	//конвертация в массив в зависимости от ордера перичисления
@@ -231,15 +295,48 @@ struct Tree {
 
 	//конвертация дерева в массив с инфиксным ордером перечисления
 	int* ToArray(Order order = Infix) {
-		int* arr = new int[count()];
+		if (cnt == 0) { 
+			return 0; 
+		}
+		int* arr = new int[cnt];
 		int index = 0;
-		if (order > 2) {
-			traverse(arr, index, order, root);
+		if (order == LevelsUpLeft) {
+			arr = ToLevels(LevelsUpLeft);
+			return arr;
 		}
-		if (order < 3) {
-			req(arr, index, order, root);
+		if (order == LevelsUpRight) {
+			arr = ToLevels(LevelsUpRight);
+			return arr;
 		}
+		if (order == LevelsDownLeft) {
+			arr = ToLevels(LevelsDownLeft);
+			return arr;
+		}
+		if (order == LevelsDownRight) {
+			arr = ToLevels(LevelsDownRight);
+			return arr;
+		}
+		input(arr, 0, order, root);
 		return arr;
+	}
+
+	//
+	int input(int* arr, int index, Order order, Treenode* node) {
+		if (node == nullptr) return index;
+		if (order == Prefix) {
+			arr[index] = node->key;
+			index++;
+		}
+		index = input(arr, index, order, node->left);
+		if (order == Infix) {
+			arr[index] = node->key;
+			index++;
+		}
+		index = input(arr, index, order, node->right);
+		if (order == Postfix) {
+			arr[index] = node->key;
+			index++;
+		}
 	}
 
 	//поиск узла по значению
@@ -489,8 +586,8 @@ int main()
 	cout << "9. балансировки дерева" << endl;
 	cout << "0. завершения работы программы" << endl;
 
-	int key, check;
-	int* arr;
+	int key, check, par;
+	int* arr = 0;
 
 	while (true) {
 		int key, numb, cnt = 0;
@@ -535,12 +632,24 @@ int main()
 			cout << "Количество элементов в дереве: " << tree.count() << endl;
 			break;
 		case 6:
-			arr = tree.ToArray();
-			cout << "элементы дерева: ";
-			for (int i = 0; i < tree.count(); i++) {
-				cout << arr[i] << " ";
-			}
-			cout << endl;
+			cout << "\n1 - префиксный порядок\n";
+			cout << "2 - инфиксный порядок\n";
+			cout << "3 - постфиксный порядок\n";
+			cout << "4 - вывод сверху вниз, слева направо\n";
+			cout << "5 - вывод сверху вниз, справа налево\n";
+			cout << "6 - вывод снизу вверх, слева направо\n";
+			cout << "7 - вывод снизу вверх, справа налево\n\n";
+			cin >> par;
+			if (par == 1) { arr = tree.ToArray(tree.Prefix); }
+			if (par == 2) { arr = tree.ToArray(tree.Infix); }
+			if (par == 3) { arr = tree.ToArray(tree.Postfix); }
+			if (par == 4) { arr = tree.ToArray(tree.LevelsUpLeft); }
+			if (par == 5) { arr = tree.ToArray(tree.LevelsUpRight); }
+			if (par == 6) { arr = tree.ToArray(tree.LevelsDownLeft); }
+			if (par == 7) { arr = tree.ToArray(tree.LevelsDownRight); }
+			cout << "\n";
+			for (int i = 0; i < tree.cnt; i++) { cout << arr[i] << " "; }
+			cout << "\n";
 			break;
 		case 7:
 			cout << "Введите число, относительно которого необходимо сделать поворот: ";
